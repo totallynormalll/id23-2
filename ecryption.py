@@ -1,121 +1,187 @@
-# Функция шифрования обобщенным шифром Цезаря
-def encrypt(key, message):
-    return ''.join(chr((ord(c) + key) % 65536) for c in message)
+# Функция для размножения ключа до длины сообщения
+def extend_key(key, length):
+    if not key:
+        raise ValueError("Ключ не может быть пустым")
+    return (key * (length // len(key) + 1))[:length]
 
-# Функция дешифрования обобщенным шифром Цезаря
-def decrypt(key, message):
-    return ''.join(chr((ord(c) - key) % 65536) for c in message)
+# Функция шифрования шифром Виженера
+def encrypt(key, message, alphabet_mode=False):
+    """
+    Шифрует сообщение с помощью шифра Виженера.
+    
+    Args:
+        key: Ключ шифрования
+        message: Сообщение для шифрования
+        alphabet_mode: Если True, использует алфавитный режим для латиницы/кириллицы,
+                       иначе использует обобщенный Юникод-режим
+    """
+    if not message:
+        return ""
+        
+    # Размножаем ключ до длины сообщения
+    extended_key = extend_key(key, len(message))
+    encrypted_chars = []
+    
+    if not alphabet_mode:
+        # Обобщенный режим для всех символов Юникода
+        for m_char, k_char in zip(message, extended_key):
+            encrypted_char = chr((ord(m_char) + ord(k_char)) % 65536)
+            encrypted_chars.append(encrypted_char)
+    else:
+        # Алфавитный режим для латиницы и кириллицы
+        key_idx = 0
+        for char in message:
+            if 'A' <= char <= 'Z':
+                # Для английских заглавных букв
+                shift = ord(extended_key[key_idx].upper()) % 26
+                if 'A' <= extended_key[key_idx].upper() <= 'Z':
+                    shift = ord(extended_key[key_idx].upper()) - ord('A')
+                encrypted_char = chr((ord(char) - ord('A') + shift) % 26 + ord('A'))
+                key_idx += 1
+            elif 'a' <= char <= 'z':
+                # Для английских строчных букв
+                shift = ord(extended_key[key_idx].upper()) % 26
+                if 'A' <= extended_key[key_idx].upper() <= 'Z':
+                    shift = ord(extended_key[key_idx].upper()) - ord('A')
+                encrypted_char = chr((ord(char) - ord('a') + shift) % 26 + ord('a'))
+                key_idx += 1
+            elif 'А' <= char <= 'Я' or char == 'Ё':
+                # Для русских заглавных букв
+                char_code = ord(char) - ord('А') if char != 'Ё' else 6
+                key_char = extended_key[key_idx].upper()
+                key_code = ord(key_char) - ord('А') if key_char != 'Ё' and 'А' <= key_char <= 'Я' else 0
+                new_code = (char_code + key_code) % 33
+                if new_code == 6:
+                    encrypted_char = 'Ё'
+                else:
+                    if new_code > 6:
+                        new_code -= 1
+                    encrypted_char = chr(new_code + ord('А'))
+                key_idx += 1
+            elif 'а' <= char <= 'я' or char == 'ё':
+                # Для русских строчных букв
+                char_code = ord(char) - ord('а') if char != 'ё' else 6
+                key_char = extended_key[key_idx].lower()
+                key_code = ord(key_char) - ord('а') if key_char != 'ё' and 'а' <= key_char <= 'я' else 0
+                new_code = (char_code + key_code) % 33
+                if new_code == 6:
+                    encrypted_char = 'ё'
+                else:
+                    if new_code > 6:
+                        new_code -= 1
+                    encrypted_char = chr(new_code + ord('а'))
+                key_idx += 1
+            else:
+                # Другие символы оставляем без изменений
+                encrypted_char = char
+            
+            encrypted_chars.append(encrypted_char)
+    
+    return ''.join(encrypted_chars)
 
-# Функция для оценки вероятности того, что текст является осмысленным
-def score_text(text, language='ru'):
-    # Наиболее частые буквы в разных языках
-    common_chars = {
-        'ru': {
-            ' ': 0.175, 'о': 0.110, 'е': 0.085, 'а': 0.080, 'и': 0.074, 
-            'н': 0.067, 'т': 0.063, 'с': 0.055, 'р': 0.047, 'в': 0.045
-        },
-        'en': {
-            ' ': 0.183, 'e': 0.120, 't': 0.091, 'a': 0.081, 'o': 0.077, 
-            'i': 0.073, 'n': 0.070, 's': 0.063, 'r': 0.060, 'h': 0.059
-        }
-    }
+# Функция дешифрования шифра Виженера
+def decrypt(key, ciphertext, alphabet_mode=False):
+    """
+    Дешифрует сообщение, зашифрованное шифром Виженера.
     
-    # Используем выбранный язык или русский по умолчанию
-    char_freqs = common_chars.get(language.lower(), common_chars['ru'])
+    Args:
+        key: Ключ шифрования
+        ciphertext: Зашифрованное сообщение
+        alphabet_mode: Если True, использует алфавитный режим для латиницы/кириллицы,
+                       иначе использует обобщенный Юникод-режим
+    """
+    if not ciphertext:
+        return ""
+        
+    # Размножаем ключ до длины шифротекста
+    extended_key = extend_key(key, len(ciphertext))
+    decrypted_chars = []
     
-    # Подсчитываем символы в тексте
-    from collections import Counter
-    text_length = len(text)
-    if text_length == 0:
-        return 0
+    if not alphabet_mode:
+        # Обобщенный режим для всех символов Юникода
+        for c_char, k_char in zip(ciphertext, extended_key):
+            decrypted_char = chr((ord(c_char) - ord(k_char)) % 65536)
+            decrypted_chars.append(decrypted_char)
+    else:
+        # Алфавитный режим для латиницы и кириллицы
+        key_idx = 0
+        for char in ciphertext:
+            if 'A' <= char <= 'Z':
+                # Для английских заглавных букв
+                shift = ord(extended_key[key_idx].upper()) % 26
+                if 'A' <= extended_key[key_idx].upper() <= 'Z':
+                    shift = ord(extended_key[key_idx].upper()) - ord('A')
+                decrypted_char = chr((ord(char) - ord('A') - shift) % 26 + ord('A'))
+                key_idx += 1
+            elif 'a' <= char <= 'z':
+                # Для английских строчных букв
+                shift = ord(extended_key[key_idx].upper()) % 26
+                if 'A' <= extended_key[key_idx].upper() <= 'Z':
+                    shift = ord(extended_key[key_idx].upper()) - ord('A')
+                decrypted_char = chr((ord(char) - ord('a') - shift) % 26 + ord('a'))
+                key_idx += 1
+            elif 'А' <= char <= 'Я' or char == 'Ё':
+                # Для русских заглавных букв
+                char_code = ord(char) - ord('А') if char != 'Ё' else 6
+                key_char = extended_key[key_idx].upper()
+                key_code = ord(key_char) - ord('А') if key_char != 'Ё' and 'А' <= key_char <= 'Я' else 0
+                new_code = (char_code - key_code) % 33
+                if new_code == 6:
+                    decrypted_char = 'Ё'
+                else:
+                    if new_code > 6:
+                        new_code -= 1
+                    decrypted_char = chr(new_code + ord('А'))
+                key_idx += 1
+            elif 'а' <= char <= 'я' or char == 'ё':
+                # Для русских строчных букв
+                char_code = ord(char) - ord('а') if char != 'ё' else 6
+                key_char = extended_key[key_idx].lower()
+                key_code = ord(key_char) - ord('а') if key_char != 'ё' and 'а' <= key_char <= 'я' else 0
+                new_code = (char_code - key_code) % 33
+                if new_code == 6:
+                    decrypted_char = 'ё'
+                else:
+                    if new_code > 6:
+                        new_code -= 1
+                    decrypted_char = chr(new_code + ord('а'))
+                key_idx += 1
+            else:
+                # Другие символы оставляем без изменений
+                decrypted_char = char
+            
+            decrypted_chars.append(decrypted_char)
     
-    char_counts = Counter(text.lower())
-    
-    # Рассчитываем оценку текста на основе частотного соответствия
-    score = 0
-    for char, expected_freq in char_freqs.items():
-        actual_freq = char_counts.get(char, 0) / text_length
-        # Чем ближе частота к ожидаемой, тем выше оценка
-        score += (1 - abs(actual_freq - expected_freq)) * expected_freq
-    
-    return score
-
-# Функция взлома шифра Цезаря с использованием частотного анализа.
-def break_cipher(text, language='ru', max_candidates=3):
-    from collections import Counter
-    
-    if not text:
-        return [], None
-    
-    # Подсчитываем частоту символов
-    counter = Counter(text)
-    
-    # Получаем частые символы в тексте
-    most_common_chars = [char for char, _ in counter.most_common(10)]
-    
-    # Наиболее частые символы в выбранном языке
-    common_chars = {
-        'ru': [' ', 'о', 'е', 'а', 'и', 'н', 'т', 'с', 'р', 'в'],
-        'en': [' ', 'e', 't', 'a', 'o', 'i', 'n', 's', 'r', 'h']
-    }
-    
-    # Используем выбранный язык или русский по умолчанию
-    freq_chars = common_chars.get(language.lower(), common_chars['ru'])
-    
-    # Пробуем разные комбинации наиболее частых символов
-    candidates = []
-    for cipher_char in most_common_chars:
-        for plain_char in freq_chars:
-            key = (ord(cipher_char) - ord(plain_char)) % 65536
-            decrypted = decrypt(key, text)
-            score = score_text(decrypted, language)
-            candidates.append((decrypted, key, score))
-    
-    # Сортируем по оценке (от лучшей к худшей)
-    candidates.sort(key=lambda x: x[2], reverse=True)
-    
-    # Возвращаем лучшие варианты
-    return candidates[:max_candidates]
+    return ''.join(decrypted_chars)
 
 # Основная часть программы
 if __name__ == "__main__":
-    # Получаем ключ от пользователя
     try:
-        key = int(input("Введите ключ для шифрования (целое число): "))
-    except ValueError:
-        print("Ошибка: ключ должен быть целым числом!")
-        exit(1)
-    
-    # Получаем текст для шифрования
-    plain_text = input("Введите текст для шифрования: ")
-    
-    # Шифруем текст
-    encrypted_text = encrypt(key, plain_text)
-    print("\nЗашифрованный текст:\n", encrypted_text)
-    
-    # Определяем язык для анализа
-    language = input("Выберите язык для анализа (ru/en), по умолчанию русский: ").lower()
-    if language not in ['ru', 'en']:
-        language = 'ru'
-    
-    # Взламываем шифр без знания ключа
-    print("\nПытаемся восстановить текст...")
-    candidates = break_cipher(encrypted_text, language)
-    
-    if candidates:
-        print("\nТоп вариантов расшифровки (в порядке убывания вероятности):")
-        for i, (candidate_text, candidate_key, score) in enumerate(candidates, 1):
-            print(f"\n{i}. Ключ: {candidate_key}, Оценка: {score:.4f}")
-            print(f"Текст: {candidate_text[:100]}{'...' if len(candidate_text) > 100 else ''}")
+        # Запрашиваем у пользователя ключ и текст для шифрования
+        key = input("Введите ключ для шифрования (строка): ")
+        if not key:
+            print("Ошибка: ключ не может быть пустым")
+            exit(1)
             
-        # Проверяем, был ли ключ определен правильно
-        if any(candidate_key == key for _, candidate_key, _ in candidates):
-            print("\nУспех! Правильный ключ найден среди кандидатов.")
+        message = input("Введите текст для шифрования: ")
+        
+        # Выбор режима шифрования
+        mode_choice = input("Использовать алфавитный режим? (да/нет, по умолчанию - нет): ").lower()
+        alphabet_mode = mode_choice in ('да', 'yes', 'y', 'д')
+        
+        # Шифруем текст
+        encrypted_text = encrypt(key, message, alphabet_mode)
+        print("\nЗашифрованный текст:\n", encrypted_text)
+        
+        # Дешифруем текст
+        decrypted_text = decrypt(key, encrypted_text, alphabet_mode)
+        print("\nРасшифрованный текст:\n", decrypted_text)
+        
+        # Проверка корректности
+        if decrypted_text == message:
+            print("\nПроверка пройдена: расшифрованный текст совпадает с исходным!")
         else:
-            print("\nВнимание: правильный ключ не найден среди кандидатов.")
-    else:
-        print("\nНе удалось расшифровать текст.")
-    
-    # Показываем правильную расшифровку для сравнения
-    print("\nДля сравнения, правильная расшифровка с исходным ключом:")
-    print(decrypt(key, encrypted_text))
+            print("\nОшибка: расшифрованный текст не совпадает с исходным.")
+            
+    except Exception as e:
+        print(f"Произошла ошибка: {e}")
